@@ -392,9 +392,13 @@ async function main() {
     // START_ZONE boundary (audit C3: the behavioral parameter nobody locked —
     // at the zone edge one pixel opens, one beyond does not, per hitTestStart's
     // inclusive `edge <= startZonePx`). The zone is ADAPTIVE: 45% of the live
-    // viewport width (startZonePxFor; 390px viewport → Math.round(175.5) =
-    // 176px), recomputed per stroke — portrait/landscape/tablet need no
-    // per-device tuning. It long since cleared Chrome Android's
+    // viewport width (startZonePxFor; 390px viewport → 176px; 2026-09-11: a
+    // brief 0.25 experiment for the draggable-widget conflict was rolled
+    // back the same day per user decision — the zone STAYS at 0.45 and the
+    // conflict is handled by the data-mobile-nav-dragging mark + the
+    // floating-widget positional heuristic, see
+    // scripts/probes/draggable-conflict-probe.mjs), recomputed per
+    // stroke — portrait/landscape/tablet need no per-device tuning. It long since cleared Chrome Android's
     // history-navigation trigger strip (EDGE_WIDTH_DP=48dp,
     // NavigationHandler.java), which claimed edge strokes before the gesture
     // layer could classify them ("页面直接返回上一页", 2026-08-29 user report).
@@ -403,7 +407,19 @@ async function main() {
     // reproduce the gesture itself, so the computed style is the assertable
     // contract here and the real-device feel needs a human pass.
     const initial = await drawerState(client)
-    check('swipe.drawer-touch-action', initial.touchAction === 'pan-y', `touchAction=${initial.touchAction}`)
+    // touch-action contract (updated by #45 zoom round): must contain pan-y
+    // (horizontal pan stays blocked so the stroke reaches the gesture layer)
+    // AND pinch-zoom (the ancestor-chain authorization the iOS focus-zoom
+    // fix requires, see scripts/cdp-zoom-probe.mjs) and must NOT contain
+    // pan-x (a pan-x token would hand horizontal panning to the browser and
+    // kill the gesture entirely).
+    check(
+      'swipe.drawer-touch-action',
+      initial.touchAction.includes('pan-y') &&
+        initial.touchAction.includes('pinch-zoom') &&
+        !initial.touchAction.includes('pan-x'),
+      `touchAction=${initial.touchAction}`,
+    )
     check(
       'swipe.root-overscroll-x-none',
       initial.rootOverscrollX === 'none' && initial.bodyOverscrollX === 'none',

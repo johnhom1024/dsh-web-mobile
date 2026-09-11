@@ -36,7 +36,7 @@
   │  ├─ build-client.mjs     ← 自研客户端打包器
   │  ├─ cdp-probe.mjs        ← 主探针 32 断言（EXPECTED_FAILURES 基线）
   │  ├─ cdp-swipe-probe/failures · cdp-zoom-probe · cdp-compat-contracts (.mjs)
-  │  └─ probes/              ← 9 个历史回归锚点（builtin-only，可单跑）
+  │  └─ probes/              ← 9 个回归锚点（builtin-only，可单跑）
   ├─ tests/                  ← 12 个 .test.ts（node --test，type-stripping 直跑）
   ├─ docs/
   │  ├─ specs/               ← 6 篇权威设计文档（入库）
@@ -129,7 +129,7 @@ dsh web
 ## Pitfalls
 - **Pitfalls 档案**：本节是压缩后的可执行不变式；每条的完整推导/取证/实验证据归档在 `docs/maintenance/pitfalls.md`（紧凑条目里标了 §小节名），复杂改动前先读对应小节。
 
-- **抽屉手势层（sidebar-swipe.ts）铁律**（完整推导/A/B 证据 → `docs/maintenance/pitfalls.md` §手势层）：开=提前提交（8px 锁轴即 arm + inline `-101%` 百分比跟随 + arm 帧 `content-visibility:hidden`）；关=晚提交（280ms 滑自身宽×110% px 槽位，落地才翻 marker，防 React 中途换子树倒跳）；手势判定后必须 `markGestureConsumed(target, 300, drawer)`，宿主 `onDrawerClick`/`onDrawerPointerUp` 首行 `isStrokeLocked() || consumeIfGestured(event)` yield；drawer 滚动容器 `touch-action: pan-y`；起点纯几何（`hitTestStart`，0.25×视口宽≈98px@390，第十轮 2026-09-11 从 0.45 缩窄，无热区元素）；inline 一律 `setProperty(...,'important')`，断言看计算后几何；`transform:none` 无 inline 残留只约束终态。参数速查：START_ZONE_RATIO=0.25、LOCK_PX=8、open/close 0.16/0.13 视口比例、速度=60ms 窗末两点斜率、openVel/closeVel 0.45px/ms、cooldown 350ms、consume 300ms（consumedEl 每次 pointerdown 清空）。让位清单（beginStroke 前置 + tryLock 每次锁轴前复查）：cooldown/modal/takeover/selection/横滚容器/**拖动标记**——拖动组件拖动期间挂 `data-mobile-nav-dragging`（被按住元素/祖先或 body/documentElement 全局）手势层即整笔让位（第十轮 D 方案 C 侧，修「拖桌宠误开抽屉」）；一旦锁轴即承诺，锁后出现的标记不回头。划词选择（双选区模型都读，塌缩光标不算拥有）与多指必须整体让位；距离从 startX 起算；#32 nav-arm 关闭路径不许掐死；`gesture-guard.ts` 保持零 import。回归门：`scripts/cdp-swipe-failures.mjs` 16 场景 + 主探针 32 断言 + `scripts/probes/draggable-conflict-probe.mjs`（D 方案两侧：原 45% 区段不再触发 / 让位标记生效 / 清除后恢复）。
+- **抽屉手势层（sidebar-swipe.ts）铁律**（完整推导/A/B 证据 → `docs/maintenance/pitfalls.md` §手势层）：开=提前提交（8px 锁轴即 arm + inline `-101%` 百分比跟随 + arm 帧 `content-visibility:hidden`）；关=晚提交（280ms 滑自身宽×110% px 槽位，落地才翻 marker，防 React 中途换子树倒跳）；手势判定后必须 `markGestureConsumed(target, 300, drawer)`，宿主 `onDrawerClick`/`onDrawerPointerUp` 首行 `isStrokeLocked() || consumeIfGestured(event)` yield；drawer 滚动容器 `touch-action: pan-y`；起点纯几何（`hitTestStart`，0.45×视口宽≈176px@390；2026-09-11 曾短暂缩到 0.25 缓解拖动冲突，同日按用户拍板回滚保持 0.45——识别区手感不变，冲突改由让位体系解决，无热区元素）；inline 一律 `setProperty(...,'important')`，断言看计算后几何；`transform:none` 无 inline 残留只约束终态。参数速查：START_ZONE_RATIO=0.45、LOCK_PX=8、open/close 0.16/0.13 视口比例、速度=60ms 窗末两点斜率、openVel/closeVel 0.45px/ms、cooldown 350ms、consume 300ms（consumedEl 每次 pointerdown 清空）。让位清单（beginStroke 前置 + tryLock 每次锁轴前复查）：cooldown/modal/takeover/selection/横滚容器/**拖动标记/悬浮窗形状**——拖动组件拖动期间挂 `data-mobile-nav-dragging`（被按住元素/祖先或 body/documentElement 全局）手势层即整笔让位（配合实现的组件走标记）；不配合的第三方可拖动悬浮件（dsh-pet 桌宠实测 148×160 fixed）走位置启发式 `findFloatingWidget`：起点祖先链上第一个 fixed|absolute 且 ≤200px（FLOATING_WIDGET_MAX_PX）的自由定位浮层即让位（frame 子树除外——FAB/backdrop/抽屉不误伤）；让位≠拦截，悬浮窗拖动照常执行；一旦锁轴即承诺，锁后出现的标记/形状不回头。划词选择（双选区模型都读，塌缩光标不算拥有）与多指必须整体让位；距离从 startX 起算；#32 nav-arm 关闭路径不许掐死；`gesture-guard.ts` 保持零 import。回归门：`scripts/cdp-swipe-failures.mjs` 16 场景 + 主探针 32 断言 + `scripts/probes/draggable-conflict-probe.mjs`（15 断言：0.45 区几何 / 无标记悬浮球让位 + 跟手 / 标记接口 / 清除后恢复）；主探针 `drawer-touch-action` 断言为含 pan-y + pinch-zoom 且不含 pan-x（#45 zoom 契约后同步）。
 - **手势消费标记的 backdrop 误吞坑（「点两次才关」）**：手势打开抽屉后 `markGestureConsumed` 链式标记手势起点目标，若起点 `event.target` 的祖先链**不含 drawer**（headless 命中穿透时起点落到 body；或 drawer 空壳无内容元素），链会一路走到 document——把 **backdrop / FAB 也标记为 consumed**。随后 1s 窗口内点 backdrop 想关闭，sidebar-swipe 的 document 捕获 `onClick` 命中标记 → `stopPropagation` → backdrop 元素级 click 监听收不到 → 点一次无效（用户感知"要点两次"）。修复：`onClick` 对命中 `[data-mobile-nav="backdrop"], [data-mobile-nav="fab"]` 的 click **无条件放行**（backdrop/FAB 绝不可能是手势合成 click 的目标——手势起点只在左缘 start zone/drawer 内容区）。同时 `markGestureConsumed` 的 upTo 收敛为 drawer（非 frame），减小误标范围。
 - **CDP 手势实测驱动的两处修正**：`touch-action` 真正落点是 html/body 而非 drawer（已改 `pan-y`，drawer 双保险）；内容区判定几何优先（`beginStroke` 用 `clientX ∈ drawerRect`，空抽屉也成立）。探针注意：隔离 profile 会弹宿主 Internal Testing Notice 模态——必须移除整个 root（只删 `[aria-modal=true]` 会留 mask 拦触摸）；反向手势等 cooldown 350ms 过期（探针每步 sleep(500)）→ `docs/maintenance/pitfalls.md` §CDP 手势实测。
 - **composer 底部行三件套契约**（完整推导+复现探针 → `docs/maintenance/pitfalls.md` §composer 行）：固定图标控件（_add 28 / ContextMeter trigger 28 / _primary 34）不参与收缩；trailing `flex:1 1 auto`、发送 `margin-left:auto` 钉右缘；自适应余量吸收器优先级=模型条>圈>发送键，互斥由置零规则双 arm（menu+dialog）保证，空隙永远在焊接簇之前；模型条与 dock 槽隔 `display:contents`，trailing 域用后代组合器；收缩规则必须 `:not` 排除 `_add`/`_primary`/`_root`；ContextMeter（`JObwrW_`）trigger 无 `aria-haspopup="menu"` 须单独钉住 root。子代理形态：running 渲染双 `_primary` → 该形态恢复官方 wrap（`:has([class*="_primary"] ~ [class*="_primary"])`）；idle 无模型条 → 圈 root 挂 auto。回归探针 `scripts/probes/subagent-composer-fix-probe.mjs`、`scripts/probes/diag-sub-idle-pin.mjs`。
@@ -200,7 +200,7 @@ dsh web
 
 ## 维护入口
 
-- 回归探针：`scripts/probes/`（9 个历史回归锚点，node:builtin-only，可单跑；主探针 `pnpm smoke:cdp` 与手势门 `cdp-swipe-failures.mjs` 见 Commands）。
+- 回归探针：`scripts/probes/`（9 个回归锚点，node:builtin-only，可单跑；主探针 `pnpm smoke:cdp` 与手势门 `cdp-swipe-failures.mjs` 见 Commands）。
 - 设计 spec：`docs/specs/`（权威设计文档随仓库走）；`.local-tests/` 探针原稿、`docs/superpowers/` 与 `docs/debug/settings-market-debug-map.md` 仍是本地不入库。
 - CI：`.github/workflows/ci.yml`——verify → test:core → build → `git diff --exit-code lib`（lib 新鲜度门）。
 - 引擎底线：`package.json` engines `node >=24.0.0`（tests 依赖 Node 原生 TS type-stripping）。

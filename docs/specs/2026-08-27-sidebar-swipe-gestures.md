@@ -86,11 +86,11 @@
 
 ### 本方案参数（实装值，第三轮调优 2026-08-27）
 
-> 演进：初稿 → 第二轮（用户反馈"行程太长"：open 0.30→0.20 / close 0.24→0.16）→ 第三轮（用户反馈"识别成对话内容滚动"：起点区 24→48px、轴锁定 1.5×→首段 8px 横向主导、速度窗口 120→60ms 末尾两点、阈值 0.20/0.16→0.16/0.13、新增边缘触摸 touchmove preventDefault）→ 第四轮（2026-08-29，用户反馈"判定太靠左需贴边"+"浏览器手势没禁"，真机 Android Chrome 实证页面直接返回：起点区 48→96px、根元素 `overscroll-behavior-x: none` 抑制 Chrome 边缘历史导航、新增横向滚动容器让位守卫）→ 第五轮（2026-08-29，用户要求识别区"约占总宽 45%"且"做成自适应"：起点区改 `round(0.45×视口宽)`）→ 第六轮（2026-08-29，用户报"根本没法左滑关闭"＋"希望打开抽屉之后以外的部分可以进行左滑"：关闭判定改双向、关闭起点区放宽到整个 frame）→ 第七轮（2026-08-29，用户报"左滑会卡一下、半开不开、停在最终滑动位置才消失"：跟手槽位从关闭态观测值改为被拖抽屉自身宽度的 110%）→ **第八轮（2026-08-29，用户报"松手时抽屉样式突然消失"＋要求"背景遮罩渐变"：关闭改晚提交——动画落地后才翻宿主；遮罩补齐淡出并与滑出同步）** → **第九轮（2026-08-29，用户报"右滑开头有真空期"：arm 门槛 12→8（锁轴即 arm）、开方向基线 -102%→-101%）**。均经 CDP 探针验证（`scripts/cdp-swipe-probe.mjs` 32 项 + `scripts/cdp-swipe-failures.mjs` 9 场景全绿）。
+> 演进：初稿 → 第二轮（用户反馈"行程太长"：open 0.30→0.20 / close 0.24→0.16）→ 第三轮（用户反馈"识别成对话内容滚动"：起点区 24→48px、轴锁定 1.5×→首段 8px 横向主导、速度窗口 120→60ms 末尾两点、阈值 0.20/0.16→0.16/0.13、新增边缘触摸 touchmove preventDefault）→ 第四轮（2026-08-29，用户反馈"判定太靠左需贴边"+"浏览器手势没禁"，真机 Android Chrome 实证页面直接返回：起点区 48→96px、根元素 `overscroll-behavior-x: none` 抑制 Chrome 边缘历史导航、新增横向滚动容器让位守卫）→ 第五轮（2026-08-29，用户要求识别区"约占总宽 45%"且"做成自适应"：起点区改 `round(0.45×视口宽)`）→ 第六轮（2026-08-29，用户报"根本没法左滑关闭"＋"希望打开抽屉之后以外的部分可以进行左滑"：关闭判定改双向、关闭起点区放宽到整个 frame）→ 第七轮（2026-08-29，用户报"左滑会卡一下、半开不开、停在最终滑动位置才消失"：跟手槽位从关闭态观测值改为被拖抽屉自身宽度的 110%）→ **第八轮（2026-08-29，用户报"松手时抽屉样式突然消失"＋要求"背景遮罩渐变"：关闭改晚提交——动画落地后才翻宿主；遮罩补齐淡出并与滑出同步）** → **第九轮（2026-08-29，用户报"右滑开头有真空期"：arm 门槛 12→8（锁轴即 arm）、开方向基线 -102%→-101%）** → **第十轮（2026-09-11，用户报"拖动桌宠类悬浮物会误开抽屉"，探针 draggable-conflict-probe 复现：手势层让位清单没有「拖动中元素」项，起点落 45% 区内 + 向右 ≥8px 即提前提交：先落地 0.25 缩窄（A 侧）＋`data-mobile-nav-dragging` 让位信号（C 侧）＝D 方案组合；用户实测后拍板 A 侧回滚——识别区保持 0.45 手感不变，冲突由让位体系独立解决）** → **第十一轮（2026-09-11，用户真机确认悬浮件仍误触发（dsh-pet 不挂标记），补 B 侧位置启发式 `findFloatingWidget`：起点祖先链上第一个 `position:fixed|absolute` 且 ≤200px（`FLOATING_WIDGET_MAX_PX`）的自由定位浮层即让位——dsh-pet 悬浮球实测 148×160 fixed 命中；frame 子树除外，误伤面=从 ≤200px 定位元素上起手（真实页面枚举仅 dsh-pet 本体命中）；让位≠拦截，拖动照常）**。均经 CDP 探针验证（`scripts/cdp-swipe-probe.mjs` 32 项 + `scripts/cdp-swipe-failures.mjs` 16 场景 + `scripts/probes/draggable-conflict-probe.mjs` 15 断言全绿；主探针 `drawer-touch-action` 断言同步 #45 zoom 契约：含 pan-y+pinch-zoom、不含 pan-x）。
 
 | 参数 | 值 | 说明 |
 |---|---|---|
-| `startZonePx` | **`round(0.45 × 视口宽)`** | 识别起点区，第五轮改为自适应比例（`START_ZONE_RATIO = 0.45`，390px → 176px；每次 stroke 用实时视口现算，竖屏/横屏/平板无需分别调参）。演进 24 → 48 → 96 → 45%。第四轮的两条依据仍然成立：① 48px 外自然落指（50-100px）完全无响应（"判定太靠左"）；② Chrome Android 历史导航触发条 `EDGE_WIDTH_DP=48dp`（Chromium `NavigationHandler.java`）与旧 48px 区完全重叠——贴边起指被浏览器抢走返回；45% 区远超所有浏览器边条（Chrome ≤48dp、WebKit ~40px guard 先例）。距离/速度阈值仍兜底，放宽起点不会误触（视觉热区元素已于 2026-08-29 删除，判定纯几何） |
+| `startZonePx` | **`round(0.45 × 视口宽)`** | 识别起点区（`START_ZONE_RATIO = 0.45`，390px → 176px；每次 stroke 用实时视口现算，竖屏/横屏/平板无需分别调参）。演进 24 → 48 → 96 → 45%。2026-09-11 拖动冲突轮曾缩到 0.25，同日按用户拍板回滚保持 0.45——识别区手感不变，冲突改由让位体系（`data-mobile-nav-dragging` 标记 + 悬浮窗位置启发式，见下）解决。距离/速度阈值兜底，放宽起点不会误触（视觉热区元素已于 2026-08-29 删除，判定纯几何） |
 | `lockPx` | **8** | 轴锁定：首段 8px 内 `\|dx\| > \|dy\|` 即锁横向（弃 1.5× 偏置——会拒绝 ~45° 自然斜滑）；纵向主导即放弃交还滚动 |
 | `openDistanceRatio` | **0.16** 视口宽（390px→62px） | 打开阈值（vaul 25% 之下，轻快手感） |
 | `closeDistanceRatio` | **0.13**（51px@390px） | 关闭阈值（比打开低，主动操作为主） |
@@ -143,8 +143,8 @@ export function installSidebarSwipe(ctx: ClientContext): void
 ### 状态机
 
 ```
-IDLE ──pointerdown(几何命中: closed 态＝左缘45%识别区; open 态＝frame 矩形内任意处, 非横向滚动容器/kebab, 无 aria-modal, cooldown 外)──▶ ARMED
-ARMED ──位移锁定(首段8px内 |dx|>|dy|)──▶ TRACKING
+IDLE ──pointerdown(几何命中: closed 态＝左缘45%识别区; open 态＝frame 矩形内任意处, 非横向滚动容器/kebab, 无 aria-modal, 无 data-mobile-nav-dragging 让位标记, 无 ≤200px 自由定位浮层祖先, cooldown 外)──▶ ARMED
+ARMED ──位移锁定(首段8px内 |dx|>|dy|, 锁定前复查让位标记)──▶ TRACKING
 TRACKING ──每帧采样(窗口速度) + 每帧查 aria-modal(升起即取消)──▶ release
 RELEASE ──classifySwipe──▶ 'open'|'close' → markGestureConsumed + ctx.layout.toggleSidebar()（记 cooldown）
                         └──▶ 'none' / pointercancel / visibilitychange(hidden) / blur → 直接 IDLE
@@ -163,6 +163,25 @@ RELEASE ──classifySwipe──▶ 'open'|'close' → markGestureConsumed + ct
 3. 手势层自身注册 document 捕获 click：`consumeIfGestured` 命中 → `stopPropagation() + preventDefault()` → 挡住**元素级**监听（FAB/backdrop 的 `addEventListener('click', toggleSidebar)`）
 
 **自愈路径不被掐死**：非手势 tap → 谓词集合空 → 宿主原样自愈；手势 up → 宿主 timer 排定后 `toggleSidebar()` 已同步翻转 marker → 自愈回调 `drawerOpen()` false 直接 return；即使 React 异步未翻，合成 click 也撞 `consumeIfGestured`。两条时序均封闭，自愈逻辑一行未动。
+
+### 拖动元素让位体系（第十/十一轮 2026-09-11，标记接口 + 位置启发式）
+
+拖动类组件（桌宠、悬浮球、拖拽排序等）与抽屉手势共享同一条 pointer 流：手势层此前对「拖动中的元素」零感知，起点落在识别区内 + 向右 ≥8px 横向主导移动即提前提交打开抽屉（探针 `scripts/probes/draggable-conflict-probe.mjs` 复现）。两级让位：
+
+**C 侧·标记接口（配合实现的组件）**：
+
+- **标记**：拖动进行期间，把 `data-mobile-nav-dragging` 挂在**被按住的元素（或其任意祖先）**上——或挂到 `documentElement` / `body` 作全局标记（适合拖动目标会移动、或实现方不便触碰节点树的情况）。
+- **时机**：pointerdown 时挂上（最自然）；最迟首个 move 前挂上也可（手势层在**每次锁轴判定前**复查，`tryLock` 是第二个检测点）。
+- **语义**：标记在场时手势层**整条笔画让位**——不 arm、不锁轴、不 preventDefault touchmove，拖动完全归组件自己。一旦锁轴即承诺（与选区让位语义一致），锁后出现的标记不回头。
+- **解除**：pointerup / pointercancel 时移除标记，手势层下一笔照常认领。
+- **让位 ≠ 拦截**：手势层只是不认领，不阻断事件派发——组件的 pointer 拖动照常执行。
+
+**B 侧·位置启发式（不配合的第三方悬浮件，`findFloatingWidget`）**：
+
+- **形状信号**：可拖动悬浮件在 DOM 上没有标准标记，但几乎必然住在一个**小尺寸自由定位浮层**里——起点 `event.target` 沿祖先链找到第一个 `position: fixed|absolute` 且自身 ≤200px（`FLOATING_WIDGET_MAX_PX`）的元素即判定为悬浮窗。
+- **实锚**：dsh-pet 桌宠（`@linxin666/dsh-pet`，`kz2Bea_float`，`position:fixed`、实测 148×160、pointerdown/move + setPointerCapture + `touch-action:none` 标准拖动实现，无任何让位标记）命中。
+- **排除**：`[data-mobile-nav="frame"]` 子树（FAB/backdrop/抽屉内容有自己的手势语义，永不因形状误伤）；全屏 overlay 因尺寸上限天然排除。
+- **已知天花板（ponytail）**：静态的小定位元素（如消息角标）也会让位——代价是 ≤200px 点下的一次笔画起点被让位；真悬浮件若更大或改静态定位则漏——升级路径=挂 C 侧标记或调大上限。真实页面全量枚举（390px 手机 viewport）仅 dsh-pet 本体与气泡堆命中，无误伤实例。
 
 ### 热区 DOM/CSS
 

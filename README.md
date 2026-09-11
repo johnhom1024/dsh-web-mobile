@@ -49,7 +49,7 @@
 
 **修复**
 
-- 拖动桌宠类悬浮物经过屏幕左侧会误触发侧边栏：左缘识别区缩窄到视口 25%（390px 手机约 98px），并新增让位信号——拖动组件在拖动期间往被按住的元素（或 body）挂 `data-mobile-nav-dragging`，手势层即整笔让位
+- 拖动桌宠类悬浮物经过屏幕左侧会误触发侧边栏：手势层新增两级让位——可拖动悬浮窗走位置启发式（起点落在 `position:fixed|absolute` 且 ≤200px 的自由定位浮层上即让位，dsh-pet 桌宠实测命中），配合实现的组件可挂 `data-mobile-nav-dragging` 标记（被按住元素/祖先或 body）让手势层整笔让位；让位≠拦截，拖动照常执行
 - 手机端会话视图标签页过多时逐字竖排堆叠，现可横向滑动（#41 by @782042369）
 - 贴左缘划词选择会被抽屉滑出手势劫持，选区被拖没（#43 by @chstd）
 - 输入框里拖选择手柄仍会误开抽屉并清掉选区（#44 by @chstd）
@@ -184,7 +184,7 @@ pnpm build
 
 - **先读 [AGENTS.md](AGENTS.md)**：带注释的仓库树、每条 Pitfall 的紧凑不变式与完整档案（`docs/maintenance/pitfalls.md`）。
 - 本地门：`pnpm verify`（typecheck）→ `pnpm test:core`（单测）→ `pnpm build`；`lib/` 随源码入库，漏构建会被 CI 的 `git diff --exit-code lib` 新鲜度门拦下。
-- 回归探针：`scripts/probes/` 九个历史锚点可单跑（会话删除探针兼作宿主升级绊线）；主探针 `pnpm smoke:cdp`、手势门 `scripts/cdp-swipe-failures.mjs`、iOS 放大守卫 `scripts/cdp-zoom-probe.mjs`（CDP 环境参数见 AGENTS.md）。
+- 回归探针：`scripts/probes/` 九个锚点可单跑（会话删除探针兼作宿主升级绊线）；主探针 `pnpm smoke:cdp`、手势门 `scripts/cdp-swipe-failures.mjs`、iOS 放大守卫 `scripts/cdp-zoom-probe.mjs`（CDP 环境参数见 AGENTS.md）。
 - 设计文档在 `docs/specs/`；宿主升级对账走 `docs/upstream/`——`node scripts/cdp-compat-contracts.mjs` 一键核对 CSS module 哈希是否漂移。
 
 ## License
