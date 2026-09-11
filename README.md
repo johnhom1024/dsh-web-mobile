@@ -21,7 +21,7 @@
 - **状态栏避让**：刘海安全区、深/浅主题、双击缩放都处理
 - **输入区不打架**：权限胶囊、模型名、切换菜单在窄屏下不重叠
 - **长会话不卡流量**：宿主返回的大 JSON（会话历史等）自动 gzip/brotli 压缩，手机端加载明显提速
-- **平板也管**：768–1023px 触屏设备限宽居中；桌面端（鼠标指针）任何宽度都是完全 no-op，窄窗口/系统缩放也不会误启移动 UI
+- **平板也管**：768–1023px 触屏设备限宽居中，≥1024px 触屏大平板的会话行 ⋯ 菜单仍带「删除会话」；桌面端（鼠标指针）任何宽度都是完全 no-op，窄窗口/系统缩放也不会误启移动 UI
 - **诊断方便**：`?mobile-nav-debug=1` 显示悬浮诊断条（视口 / 浮层状态 / JS 错误）
 
 ---
@@ -34,6 +34,12 @@
 
 ## 更新内容
 
+### v2.4.1
+
+**修复**
+
+- 大平板横屏（≥1024px 触屏）会话行 ⋯ 菜单缺少「删除会话」：删除项解除宽度门控，触屏设备任何宽度都可用，确认弹窗在宽屏居中限宽；鼠标操作的桌面窗口任何宽度仍不注入
+
 ### v2.4.0
 
 **新功能**
@@ -43,6 +49,7 @@
 
 **修复**
 
+- 拖动桌宠类悬浮物经过屏幕左侧会误触发侧边栏：左缘识别区缩窄到视口 25%（390px 手机约 98px），并新增让位信号——拖动组件在拖动期间往被按住的元素（或 body）挂 `data-mobile-nav-dragging`，手势层即整笔让位
 - 手机端会话视图标签页过多时逐字竖排堆叠，现可横向滑动（#41 by @782042369）
 - 贴左缘划词选择会被抽屉滑出手势劫持，选区被拖没（#43 by @chstd）
 - 输入框里拖选择手柄仍会误开抽屉并清掉选区（#44 by @chstd）
@@ -177,7 +184,7 @@ pnpm build
 
 - **先读 [AGENTS.md](AGENTS.md)**：带注释的仓库树、每条 Pitfall 的紧凑不变式与完整档案（`docs/maintenance/pitfalls.md`）。
 - 本地门：`pnpm verify`（typecheck）→ `pnpm test:core`（单测）→ `pnpm build`；`lib/` 随源码入库，漏构建会被 CI 的 `git diff --exit-code lib` 新鲜度门拦下。
-- 回归探针：`scripts/probes/` 八个历史锚点可单跑（会话删除探针兼作宿主升级绊线）；主探针 `pnpm smoke:cdp`、手势门 `scripts/cdp-swipe-failures.mjs`、iOS 放大守卫 `scripts/cdp-zoom-probe.mjs`（CDP 环境参数见 AGENTS.md）。
+- 回归探针：`scripts/probes/` 九个历史锚点可单跑（会话删除探针兼作宿主升级绊线）；主探针 `pnpm smoke:cdp`、手势门 `scripts/cdp-swipe-failures.mjs`、iOS 放大守卫 `scripts/cdp-zoom-probe.mjs`（CDP 环境参数见 AGENTS.md）。
 - 设计文档在 `docs/specs/`；宿主升级对账走 `docs/upstream/`——`node scripts/cdp-compat-contracts.mjs` 一键核对 CSS module 哈希是否漂移。
 
 ## License

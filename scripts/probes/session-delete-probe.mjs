@@ -6,8 +6,9 @@
 // qDHVXG_listArea) — no session rows and no ⋯ menus at 390px or 768px. The
 // fork's injection surface (session rows with menus) only renders in the
 // ≥1024px desktop panel on rc.2, and renders inside the drawer on 0.1.3.
-// The client effect is mobile-gated, so on rc.2 it is an inert no-op that
-// activates when the host upgrade puts session rows into the drawer.
+// The client effect is touch-gated (TOUCH_QUERY, pointer: coarse at every
+// width since 2.4.1), so on rc.2 it is an inert no-op that activates when
+// the host upgrade puts session rows into the drawer.
 //
 // This probe therefore asserts:
 //   - the ROUTE end-to-end (405 / 400 / 404 session-not-found) — live today;
@@ -15,9 +16,12 @@
 //     the drawer" must flip to FAIL on 0.1.3, which is the maintainer's
 //     signal to re-enable the injected-item/dialog assertion suite (kept
 //     below as SKIP with the exact steps);
-//   - the desktop panel carries the rows and exactly the 3 host menu items
-//     (rename / fork / archive) with ZERO injected markers — the desktop
-//     zero-impact contract;
+//   - the mouse/pointer-less desktop panel carries the rows and exactly the
+//     3 host menu items (rename / fork / archive) with ZERO injected markers
+//     — the desktop zero-impact contract (15c/15d);
+//   - the WIDE-TOUCH desktop (same ≥1024px viewport WITH touch emulation)
+//     DOES get the injected item and its confirm dialog (16a-16d) — the
+//     large-tablet landscape contract;
 //   - selector forward-compatibility: [class*="_sessionRow"] matches the
 //     rc.2 desktop rows (YDXeBa_sessionRow), so the fork logic hits as soon
 //     a menu-bearing surface renders.
@@ -184,6 +188,48 @@ async function main() {
     }
     const dDialogs = await evaluate(`document.querySelectorAll('[data-mobile-nav="session-delete"], [data-mobile-nav="delete-dialog"], [data-mobile-nav="delete-dialog-backdrop"]').length`)
     record(dDialogs === 0, '15d.desktop-zero-delete-markers', `n=${dDialogs}`)
+
+    // ---- wide touch: same desktop viewport WITH touch emulation — the
+    // ---- delete item must come back (large-tablet landscape contract) ----
+    await client.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: true })
+    await client.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
+    await client.send('Page.navigate', { url: URL_BASE })
+    await waitFor(() => evaluate(`document.querySelector('[data-phase]')?.getAttribute('data-phase') === 'active'`), 'wide-touch-active', 30000)
+    await sleep(1800)
+    await evaluate(`for (const m of document.querySelectorAll('[n="true"]')) m.remove()`)
+    const wtMenu = await desktopOpenMenu(client, evaluate)
+    record(wtMenu, '16a.wide-touch-menu-opens')
+    if (wtMenu) {
+      const wtItems = await evaluate(`document.querySelectorAll('[role="menu"] [role="menuitem"]').length`)
+      const wtInjected = await evaluate(`document.querySelectorAll('[data-mobile-nav="session-delete"]').length`)
+      record(wtItems === 4 && wtInjected === 1, '16b.wide-touch-menu-has-delete-item', `items=${wtItems} injected=${wtInjected}`)
+      // Tap the injected item: it closes the host menu and opens the confirm
+      // dialog. No deletion happens until the dialog's own "yes" is tapped,
+      // which this probe never does.
+      const delBtn = await evaluate(`(() => {
+        const b = document.querySelector('[data-mobile-nav="session-delete"]')
+        if (!b) return null
+        const rc = b.getBoundingClientRect()
+        return rc.width > 0 ? { x: rc.x + rc.width / 2, y: rc.y + rc.height / 2 } : null
+      })()`)
+      if (delBtn) {
+        await tapAt(client, delBtn.x, delBtn.y, true)
+        await sleep(600)
+        const wtDialog = await evaluate(`document.querySelectorAll('[data-mobile-nav="delete-dialog"]').length`)
+        record(wtDialog === 1, '16c.wide-touch-confirm-dialog-opens', `dialogs=${wtDialog}`)
+        await client.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+        await client.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+        await sleep(300)
+        const wtDialogGone = await evaluate(`document.querySelectorAll('[data-mobile-nav="delete-dialog"]').length`)
+        record(wtDialogGone === 0, '16d.wide-touch-dialog-closes-on-escape', `dialogs=${wtDialogGone}`)
+      } else {
+        record(false, '16c.wide-touch-confirm-dialog-opens', 'injected item not visible')
+      }
+    } else {
+      record(false, '16b.wide-touch-menu-has-delete-item', 'menu did not open')
+      record(false, '16c.wide-touch-confirm-dialog-opens', 'menu did not open')
+      record(false, '16d.wide-touch-dialog-closes-on-escape', 'menu did not open')
+    }
   } finally {
     chrome.kill()
     await sleep(300)
